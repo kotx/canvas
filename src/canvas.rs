@@ -1,5 +1,5 @@
 use image::{ImageBuffer, Rgba};
-use ndarray::{Array3, Axis};
+use ndarray::{Array3, Axis, Zip};
 
 use self::{
 	channel::{A, B, G, R},
@@ -93,26 +93,13 @@ impl Canvas {
 		array_to_image(&self.pixels)
 	}
 
-	pub fn merge(&mut self, other: &Canvas) -> Result<(), Error> {
-		let dim = self.pixels.dim();
-		assert_eq!(dim, other.pixels.dim());
-
-		let mut x = 0;
-		let mut y = 0;
-		for rgba in other.pixels.lanes(Axis(2)).into_iter() {
-			if rgba[A_IDX as usize] != 0 {
-				let rgba_slice = rgba.to_slice().unwrap();
-				self.set_rgb(x, y, rgba_slice[0..3].try_into().unwrap())?;
-			}
-
-			if x == dim.1 - 1 {
-				x = 0;
-				y += 1;
-			} else {
-				x += 1;
-			}
-		}
-
-		Ok(())
+	pub fn merge(&mut self, other: &Canvas) {
+		Zip::from(self.pixels.lanes_mut(Axis(2)))
+			.and(other.pixels.lanes(Axis(2)))
+			.for_each(|mut self_pixels, other_pixels| {
+				if other_pixels[A_IDX as usize] != 0 {
+					self_pixels.assign(&other_pixels);
+				}
+			});
 	}
 }
